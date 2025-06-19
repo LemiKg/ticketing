@@ -1,0 +1,120 @@
+name: CI/CD Hetzner Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # First generate a version tag
+  generate-version:
+    uses: ./.github/workflows/version-tag.yaml
+    permissions:
+      contents: write
+
+  # Then deploy using the generated version
+  deploy:
+    needs: generate-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" | tr -d '\r' > /tmp/private_key
+          chmod 600 /tmp/private_key
+
+      - name: Test SSH connection
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" "echo 'SSH Connection Successful!'"
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      # We need to install dependencies as npm run build depends on certain packages
+      - name: Install php dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Create ZIP Artifact
+        run: |
+          zip -r timehive.zip . -x "vendor/*" ".git/*"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: timehive-v${{ needs.generate-version.outputs.version }}
+          path: timehive.zip
+
+      - name: Deploy to Hetzner
+        env:
+          HETZNER_SSH_HOST: ${{ secrets.HETZNER_SSH_HOST }}
+          HETZNER_SSH_USER: ${{ secrets.HETZNER_SSH_USER }}
+          VERSION: ${{ needs.generate-version.outputs.version }}
+        run: |
+          echo "Deploying version v${VERSION} to Hetzner server"
+
+          # Copy the ZIP file to the server
+          scp -i /tmp/private_key -P 2299 -o StrictHostKeyChecking=no \
+            timehive.zip "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}:/tmp/timehive-v${VERSION}.zip"
+
+          # SSH into the server to unpack the ZIP and clean up
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" << EOF
+            # Create directory if it doesn't exist
+            mkdir -p /var/www/timehive
+
+            # Create version file
+            echo "v${VERSION}" > /var/www/timehive/VERSION.txt
+
+            # Unzip the file to the destination
+            unzip -o /tmp/timehive-v${VERSION}.zip -d /var/www/timehive
+
+            # Delete the ZIP file
+            rm /tmp/timehive-v${VERSION}.zip
+
+            echo "ZIP file v${VERSION} unpacked and cleaned up successfully!"
+          EOF
+
+      - name: Configure Laravel on Hetzner
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" << 'EOF'
+            set -e  # Exit on error
+            cd /var/www/timehive
+            sudo chown -R $USER:$USER .
+            # Install dependencies on the server
+            composer install --no-dev --optimize-autoloader
+
+            # Apply database migrations
+            php artisan migrate --force
+
+            # Optimize configurations
+            php artisan cache:clear
+            php artisan config:clear
+
+            # Restart services
+            sudo systemctl restart php8.4-fpm nginx
+
+            echo "🚀 Deployment completed successfully!"
+          EOF
+
+      # Cleanup private key
+      - name: Cleanup private key
+        run: rm -f /tmp/private_key
+
+      # Discord notification - will run even if the deployment fails
+      - name: Discord notification
+        uses: sarisia/actions-status-discord@v1
+        if: always() # This ensures the notification is sent regardless of previous steps' status
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "TimeHive Deployment"
+          description: "Deployment of version v${{ needs.generate-version.outputs.version }} to Hetzner"
+          color: ${{ job.status == 'success' && 0x00ff00 || 0xff0000 }} # Green for success, red for failure
+          username: GitHub Deployment
+          avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+          url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

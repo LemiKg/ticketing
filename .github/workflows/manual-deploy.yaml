@@ -1,0 +1,142 @@
+name: Manual Deploy to Prod (with Artifact Option)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for deployment'
+        required: true
+        default: 'Manual deployment'
+      version:
+        description: 'Version to deploy (format: x.y.z, leave empty to generate new version)'
+        required: false
+      artifact_id:
+        description: 'Artifact ID to deploy (leave empty to build from scratch)'
+        required: false
+
+jobs:
+  # First generate a version tag if not specified
+  generate-version:
+    uses: ./.github/workflows/version-tag.yaml
+    with:
+      manual_version: ${{ inputs.version }}
+
+  # Then deploy using the generated version
+  deploy:
+    needs: generate-version
+    runs-on: ubuntu-latest
+
+    steps:
+      # Set up SSH key (needed for both build and deploy paths)
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" | tr -d '\r' > /tmp/private_key
+          chmod 600 /tmp/private_key
+
+      - name: Test SSH connection
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" "echo 'SSH Connection Successful!'"
+
+      # Build from scratch path (when no artifact_id is provided)
+      - name: Checkout repository
+        if: ${{ !inputs.artifact_id }}
+        uses: actions/checkout@v2
+
+      - name: Install Node.js dependencies
+        if: ${{ !inputs.artifact_id }}
+        run: npm install
+
+      # We need to install dependencies as npm run build depends on certain packages
+      - name: Install php dependencies
+        if: ${{ !inputs.artifact_id }}
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Build frontend assets
+        if: ${{ !inputs.artifact_id }}
+        run: npm run build
+
+      - name: Create ZIP Artifact
+        if: ${{ !inputs.artifact_id }}
+        run: |
+          zip -r timehive.zip . -x "vendor/*" ".git/*"
+
+      - name: Upload Artifact
+        if: ${{ !inputs.artifact_id }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: timehive-v${{ needs.generate-version.outputs.version }}
+          path: timehive.zip
+
+      # Use existing artifact path (when artifact_id is provided)
+      - name: Download specified artifact
+        if: ${{ inputs.artifact_id }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_id }}
+          path: ./
+
+      # If the downloaded artifact is not a zip file, we need to create one
+      - name: Ensure we have a zip file
+        if: ${{ inputs.artifact_id }}
+        run: |
+          if [ ! -f timehive.zip ]; then
+            echo "Downloaded artifact is not a zip file. Creating one..."
+            zip -r timehive.zip . -x "vendor/*" ".git/*"
+          else
+            echo "Using downloaded zip file."
+          fi
+
+      - name: Deploy to Hetzner Prod
+        env:
+          HETZNER_SSH_HOST: ${{ secrets.HETZNER_SSH_HOST }}
+          HETZNER_SSH_USER: ${{ secrets.HETZNER_SSH_USER }}
+          VERSION: ${{ needs.generate-version.outputs.version }}
+        run: |
+          echo "Deploying version v${VERSION} to Hetzner server (Prod)"
+
+          # Copy the ZIP file to the server
+          scp -i /tmp/private_key -P 2299 -o StrictHostKeyChecking=no \
+            timehive.zip "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}:/tmp/timehive-v${VERSION}.zip"
+
+          # SSH into the server to unpack the ZIP and clean up
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" << EOF
+            # Create directory if it doesn't exist
+            mkdir -p /var/www/html
+
+            # Create version file
+            echo "v${VERSION}" > /var/www/html/VERSION.txt
+
+            # Unzip the file to the destination
+            unzip -o /tmp/timehive-v${VERSION}.zip -d /var/www/html
+
+            # Delete the ZIP file
+            rm /tmp/timehive-v${VERSION}.zip
+
+            echo "ZIP file v${VERSION} unpacked and cleaned up successfully!"
+          EOF
+
+      - name: Configure Laravel on Hetzner
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p 2299 "${{ secrets.HETZNER_SSH_USER }}@${{ secrets.HETZNER_SSH_HOST }}" << 'EOF'
+            set -e  # Exit on error
+            cd /var/www/html
+            sudo chown -R $USER:$USER .
+            # Install dependencies on the server
+            composer install --no-dev --optimize-autoloader
+
+            # Apply database migrations
+            php artisan migrate --force
+
+            # Optimize configurations
+            php artisan cache:clear
+            php artisan config:clear
+
+            # Restart services
+            sudo systemctl restart php8.4-fpm nginx
+
+            echo "🚀 Manual deployment to /var/www/html completed successfully!"
+          EOF
+
+      # Cleanup private key
+      - name: Cleanup private key
+        run: rm -f /tmp/private_key

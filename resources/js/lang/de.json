@@ -1,0 +1,90 @@
+{
+  "website": {
+    "nav": {
+      "home": "Startseite",
+      "features": "Funktionen",
+      "pricing": "Preise",
+      "support": "Support",
+      "contact": "Kontakt"
+    },
+    "hero": {
+      "title": "Willkommen in unserer Anwendung",
+      "title_span": "Moderne Plattform",
+      "description": "Erweiterte Laravel + Vue.js Anwendung für Ihre Bedürfnisse.",
+      "button": "Starten"
+    },
+    "contact": {
+      "title": "Kontakt",
+      "description": "Kontaktieren Sie uns für Fragen oder Informationen.",
+      "form": {
+        "name": "Name",
+        "email": "E-Mail",
+        "message": "Nachricht",
+        "submit": "Senden"
+      }
+    }
+  },
+  "auth": {
+    "login": "Anmelden",
+    "logout": "Abmelden",
+    "register": "Registrieren",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "remember": "Angemeldet bleiben",
+    "forgot_password": "Passwort vergessen?",
+    "confirm_password": "Passwort bestätigen"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Willkommen im Dashboard"
+  },
+  "users": {
+    "title": "Benutzer",
+    "create": "Benutzer erstellen",
+    "edit": "Benutzer bearbeiten",
+    "name": "Name",
+    "email": "E-Mail",
+    "roles": "Rollen",
+    "status": "Status",
+    "actions": "Aktionen"
+  },
+  "roles": {
+    "title": "Rollen",
+    "create": "Rolle erstellen",
+    "edit": "Rolle bearbeiten",
+    "name": "Name",
+    "permissions": "Berechtigungen",
+    "actions": "Aktionen"
+  },
+  "profile": {
+    "title": "Profil",
+    "edit": "Profil bearbeiten",
+    "name": "Name",
+    "email": "E-Mail",
+    "update": "Profil aktualisieren"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "view": "Anzeigen",
+    "create": "Erstellen",
+    "update": "Aktualisieren",
+    "search": "Suchen",
+    "filter": "Filtern",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "loading": "Lädt...",
+    "no_data": "Keine Daten",
+    "confirm": "Bestätigen",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "validation": {
+    "required": "Dieses Feld ist erforderlich",
+    "email": "Geben Sie eine gültige E-Mail-Adresse ein",
+    "min": "Mindestzeichen: :min",
+    "max": "Maximalzeichen: :max"
+  }
+}

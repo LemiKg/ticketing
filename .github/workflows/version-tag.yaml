@@ -1,0 +1,35 @@
+name: Generate Version Tag
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: "The version that was generated"
+        value: ${{ jobs.tag.outputs.new_version }}
+      tag:
+        description: "The tag that was generated"
+        value: ${{ jobs.tag.outputs.new_tag }}
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    outputs:
+      new_version: ${{ steps.tag_version.outputs.new_version }}
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate tag and version
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: main
