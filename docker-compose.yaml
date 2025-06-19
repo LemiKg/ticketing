@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:17.2
-    container_name: boilerplate_postgresql
+    container_name: webshop_postgresql
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE}
@@ -16,7 +16,7 @@ services:
 
   redis:
     image: redis:7.4.2
-    container_name: boilerplate_redis
+    container_name: webshop_redis
     restart: unless-stopped
     ports:
       - '6379:6379'
