@@ -8,6 +8,12 @@ This document describes the frontend architecture of the TimeHive application, b
 2. [Technology Stack](#2-technology-stack)
 3. [Directory Structure](#3-directory-structure)
 4. [Component Architecture](#4-component-architecture)
+   - [4.1. Page Components](#41-page-components)
+   - [4.2. Form Components](#42-form-components)
+   - [4.3. Composables](#43-composables)
+   - [4.4. Composable Type Definitions](#44-composable-type-definitions)
+   - [4.5. Utility Functions](#45-utility-functions)
+   - [4.6. Component Organization](#46-component-organization)
 5. [UI Patterns](#5-ui-patterns)
 6. [Form Handling](#6-form-handling)
 7. [Data Table Implementation](#7-data-table-implementation)
@@ -38,7 +44,13 @@ resources/
 │   │   └── EntityName/
 │   │       └── EntityNameForm.vue
 │   ├── Composables/
-│   │   └── useDebounce.ts
+│   │   ├── useDebounce.ts
+│   │   ├── useDataTable.ts
+│   │   ├── useCrud.ts
+│   │   ├── useCrudModal.ts
+│   │   ├── useFlashMessages.ts
+│   │   ├── useErrorTranslation.ts
+│   │   └── useAjaxSubmission.ts
 │   ├── Layouts/
 │   │   └── AuthenticatedLayout.vue
 │   ├── Pages/
@@ -47,7 +59,15 @@ resources/
 │   │           ├── Index.vue
 │   │           ├── CreateOrEditEntity.vue
 │   │           └── ShowEntity.vue
+│   ├── lang/
+│   │   └── [localization files]
+│   ├── types/
+│   │   └── interfaces.ts
+│   ├── utils/
+│   │   └── [utility functions]
 │   ├── app.ts
+│   ├── bootstrap.ts
+│   └── ssr.ts
 ```
 
 ## 4. Component Architecture
@@ -91,17 +111,11 @@ Forms are separated into their own components to promote reusability and separat
 
 ### 4.3. Composables
 
-Composables provide reusable functionality across components:
+Composables provide reusable functionality across components. TimeHive includes several composables that handle common patterns:
 
 #### 4.3.1. Data Table Composable (`useDataTable`)
 
-Handles all data table functionality including:
-
-- Pagination
-- Sorting
-- Searching and filtering
-- Debouncing filters
-- Loading states
+Handles all data table functionality including pagination, sorting, searching, filtering, debouncing, and loading states. This composable manages PrimeVue DataTable state and Inertia.js route navigation.
 
 ```typescript
 const {
@@ -109,12 +123,12 @@ const {
   filters, // Reactive filters object
   localSortField, // Current sort field
   localSortOrder, // Current sort order ('asc' or 'desc')
+  refreshData, // Refresh data with current parameters
   onFilter, // Handler for filter changes (with debounce)
   onPage, // Handler for page changes
   onSort, // Handler for sort changes
   updateFilter, // Update a specific filter
   syncWithProps, // Sync state with incoming props
-  refreshData, // Refresh data with current parameters
 } = useDataTable<EntityType>(paginatedData, {
   routeName: 'entities.index',
   initialSortField: props.sortField,
@@ -122,16 +136,31 @@ const {
   initialFilters: {
     searchName: props.searchName,
   },
+  filterMappings: {
+    // Optional: map filter keys to different query params
+    status: 'statusFilter',
+  },
+  additionalParams: {
+    // Optional: additional query parameters
+    include: 'relationships',
+    scope: 'active',
+  },
+  debounceTime: 300, // Optional: debounce delay in ms (default: 300)
 });
 ```
 
+**Key Features:**
+
+- Server-side pagination and sorting
+- Debounced search and filtering
+- Automatic state synchronization with props
+- Flexible filter mapping for different query parameter names
+- Support for additional query parameters
+- Loading state management
+
 #### 4.3.2. CRUD Operations Composable (`useCrud`)
 
-Handles common CRUD operations:
-
-- Navigation to create/edit pages
-- Delete operations with confirmation
-- Standard entity operations
+Handles common CRUD operations with built-in navigation, confirmation dialogs, and toast notifications.
 
 ```typescript
 const {
@@ -139,20 +168,213 @@ const {
   editItem, // Navigate to edit page
   viewItem, // Navigate to view/show page
   confirmDelete, // Show delete confirmation dialog
+  deleteItem, // Direct delete without confirmation (internal use)
 } = useCrud({
-  resourceName: 'entity',
-  resourceRouteName: 'entities',
-  i18nPrefix: 'entities',
+  resourceName: 'entity', // For error messages/logging
+  resourceRouteName: 'entities', // Laravel route name prefix
+  i18nPrefix: 'entities', // Translation key prefix
+  onSuccess: () => {
+    // Optional: callback after successful delete
+    // Custom success handler
+  },
 });
 ```
 
+**Key Features:**
+
+- Built-in confirmation dialogs for delete operations
+- Automatic toast notifications for success/error states
+- Navigation helpers for standard CRUD routes
+- Internationalization support
+- Custom success callbacks
+
 #### 4.3.3. Flash Messages Composable (`useFlashMessages`)
 
-Handles automatic toast notifications from flash messages:
+Automatically converts Inertia.js flash messages into PrimeVue toast notifications.
 
 ```typescript
 // Automatically shows toasts for success, error, etc.
-useFlashMessages({ i18nPrefix: 'entities' });
+useFlashMessages({
+  i18nPrefix: 'entities', // Translation key prefix for toast titles
+});
+```
+
+**Key Features:**
+
+- Automatic detection of flash messages from Inertia.js
+- Prevents duplicate toast notifications
+- Watches for new flash messages and displays them
+- Uses i18n for toast titles (e.g., `entities.success`, `entities.error`)
+
+#### 4.3.4. CRUD Modal Composable (`useCrudModal`)
+
+Handles modal-based CRUD operations with form management, validation, and submission.
+
+```typescript
+const createModal = useCrudModal<EntityFormData>({
+  resourceName: 'entities',
+  i18nPrefix: 'entities',
+  formSchema: {
+    name: '',
+    email: '',
+    status: 'active',
+  },
+  transformFormData: (data) => {
+    // Optional: transform data before submission
+    return {
+      ...data,
+      status: data.status === 'active' ? 1 : 0,
+    };
+  },
+});
+
+// In your component
+const {
+  form, // Inertia form instance
+  isVisible, // Computed visibility state
+  isEditing, // Computed editing state (true if item has ID)
+  modalTitle, // Computed modal title based on create/edit
+  submitButtonText, // Computed button text based on create/edit
+  submit, // Form submission handler
+  setupFormWatcher, // Setup form data watching
+} = createModal(props);
+```
+
+**Key Features:**
+
+- Automatic form state management for create/edit modes
+- Built-in validation error handling
+- Modal visibility management
+- Toast notifications for success/error states
+- Form data transformation support
+
+#### 4.3.5. AJAX Submission Composable (`useAjaxSubmission`)
+
+Handles direct AJAX form submissions with CSRF protection, validation error handling, and toast notifications.
+
+```typescript
+const { submitForm } = useAjaxSubmission();
+
+await submitForm({
+  url: '/api/entities',
+  method: 'POST', // or 'PUT'
+  data: formData,
+  onSuccess: () => {
+    // Handle successful submission
+    resetForm();
+    closeModal();
+  },
+  onValidationError: (errors) => {
+    // Handle validation errors
+    setFormErrors(errors);
+  },
+  i18nPrefix: 'entities',
+  isEditing: false,
+});
+```
+
+**Key Features:**
+
+- CSRF token management
+- JSON request/response handling
+- Validation error processing
+- Success/error toast notifications
+- Async/await support
+
+#### 4.3.6. Error Translation Composable (`useErrorTranslation`)
+
+Automatically translates Laravel validation error messages that use translation keys.
+
+```typescript
+const { translateError, useTranslatedError } = useErrorTranslation();
+
+// Direct translation
+const translatedMessage = translateError('validation.required');
+
+// Reactive translation for form errors
+const translatedError = useTranslatedError(() => form.errors.email);
+```
+
+**Key Features:**
+
+- Automatic detection of translation keys
+- Support for common Laravel error message prefixes
+- Reactive translation for form errors
+- Fallback to original message if translation fails
+
+#### 4.3.7. Debounce Utility (`useDebounce`)
+
+Simple debounce utility for delaying function execution.
+
+```typescript
+const debouncedSearch = useDebounce((searchTerm: string) => {
+  performSearch(searchTerm);
+}, 300);
+
+// Usage
+debouncedSearch('search term');
+```
+
+**Key Features:**
+
+- Generic function debouncing
+- Configurable delay
+- Automatic cleanup of previous timeouts
+- TypeScript support for function parameters
+
+### 4.4. Composable Type Definitions
+
+The composables use well-defined TypeScript interfaces for type safety and better developer experience:
+
+#### DataTableOptions Interface
+
+```typescript
+interface DataTableOptions {
+  routeName: string; // Required: Inertia route name for data fetching
+  initialSortField?: string; // Initial sort field (default: 'id')
+  initialSortOrder?: string; // Initial sort order (default: 'asc')
+  initialFilters?: Record<string, any>; // Initial filter values
+  filterMappings?: Record<string, string>; // Map filter keys to query param names
+  additionalParams?: Record<string, any>; // Additional query parameters
+  debounceTime?: number; // Debounce delay in ms (default: 300)
+}
+```
+
+#### CrudOptions Interface
+
+```typescript
+interface CrudOptions {
+  resourceName: string; // Resource name for error logging
+  resourceRouteName: string; // Laravel route name prefix
+  i18nPrefix: string; // Translation key prefix for messages
+  onSuccess?: () => void; // Optional callback after successful delete
+}
+```
+
+#### FlashOptions Interface
+
+```typescript
+interface FlashOptions {
+  i18nPrefix: string; // Translation key prefix for toast titles
+}
+```
+
+#### Filter Interfaces
+
+```typescript
+interface FilterValue {
+  value: any;
+  matchMode: string;
+}
+
+interface FilterValueObject {
+  constraints: FilterValue[];
+  operator: string;
+}
+
+interface Filters {
+  [key: string]: FilterValue | FilterValueObject;
+}
 ```
 
 ## 5. UI Patterns
@@ -261,7 +483,7 @@ const {
   onPage,
   onSort,
   syncWithProps,
-} = useDataTable<EntityType>(props.entities, {
+} = useDataTable<Entity>(props.entities, {
   routeName: 'entities.index',
   initialSortField: props.sortField,
   initialSortOrder: props.sortOrder,
@@ -511,3 +733,37 @@ useFlashMessages({ i18nPrefix: 'entities' });
 ```
 
 By following these patterns and leveraging composables, you'll maintain consistency across the TimeHive application while efficiently implementing new features with less code duplication.
+
+### 4.6. Component Organization
+
+Components are organized by function and reusability:
+
+#### Base Components (`Components/base/`)
+
+- `Modal.vue`: Base modal component for overlays
+- `ResponsiveActionButtons.vue`: Responsive action button layouts
+- `SecondaryButton.vue`: Secondary button styling
+- `HeaderWebsite.vue` & `FooterWebsite.vue`: Website layout components
+
+#### Form Components (`Components/forms/`)
+
+- `TextInput.vue`: Styled text input with error handling
+- `InputLabel.vue`: Form input labels
+- `InputError.vue`: Error message display
+- `Checkbox.vue`: Styled checkbox component
+- `ContactForm.vue`: Contact form implementation
+
+#### Navigation Components (`Components/navigation/`)
+
+- `Sidebar.vue`: Application sidebar navigation
+- `NavLink.vue`: Navigation link component
+
+#### Feature-Specific Components
+
+Organized by feature (e.g., `Components/Users/`, `Components/theme/`, `Components/language/`)
+
+#### Component Naming Conventions
+
+- PascalCase for all component files
+- Descriptive names indicating purpose
+- Grouped by domain/feature when applicable

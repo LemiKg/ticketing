@@ -98,28 +98,24 @@ export interface ActionMenuItem {
 
 // Composable Options interfaces
 export interface FlashOptions {
-  i18nPrefix?: string;
-  successKey?: string;
-  errorKey?: string;
+  i18nPrefix: string; // Translation key prefix for toast titles (e.g., 'users.success', 'users.error')
 }
 
 export interface CrudOptions {
-  resourceRouteName: string;
-  i18nPrefix?: string;
-  deleteConfirmationTitle?: string;
-  deleteConfirmationMessage?: string;
+  resourceName: string; // Resource name for error logging
+  resourceRouteName: string; // Laravel route name prefix (e.g., 'users' for users.create, users.edit, etc.)
+  i18nPrefix: string; // Translation key prefix for messages
+  onSuccess?: () => void; // Optional callback after successful delete
 }
 
 export interface DataTableOptions {
-  searchable?: boolean;
-  sortable?: boolean;
-  filterable?: boolean;
-  exportable?: boolean;
-  perPageOptions?: number[];
-  defaultPerPage?: number;
-  initialSortField?: string;
-  initialSortOrder?: string;
-  initialFilters?: Record<string, any>;
+  routeName: string; // Required: Inertia route name for data fetching
+  initialSortField?: string; // Initial sort field (default: 'id')
+  initialSortOrder?: string; // Initial sort order (default: 'asc')
+  initialFilters?: Record<string, any>; // Initial filter values
+  filterMappings?: Record<string, string>; // Map filter keys to query param names
+  additionalParams?: Record<string, any>; // Additional query parameters
+  debounceTime?: number; // Debounce delay in ms (default: 300)
 }
 
 // Filter interfaces for DataTable

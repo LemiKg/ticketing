@@ -1,21 +1,24 @@
 <script setup lang="ts">
+import ClickableName from '@/Components/base/ClickableName.vue';
+import QuickPermissionsModal from '@/Components/Roles/QuickPermissionsModal.vue';
+import ResponsiveActionButtons from '@/Components/base/ResponsiveActionButtons.vue';
 import { useCrud } from '@/Composables/useCrud';
 import { useDataTable } from '@/Composables/useDataTable';
 import { useFlashMessages } from '@/Composables/useFlashMessages';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { ActionMenuItem, PaginatedData } from '@/types/interfaces';
 import { formatDate } from '@/utils/dateUtils';
 import { Head, router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-
 import Button from 'primevue/button';
 import Card from 'primevue/card';
-import Checkbox from 'primevue/checkbox';
 import Column from 'primevue/column';
+import ConfirmDialog from 'primevue/confirmdialog';
 import DataTable from 'primevue/datatable';
-import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Tag from 'primevue/tag';
+import Tooltip from 'primevue/tooltip';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 interface Role {
   id: number;
@@ -30,16 +33,8 @@ interface Permission {
   name: string;
 }
 
-interface PaginatedRoles {
-  data: Role[];
-  current_page: number;
-  per_page: number;
-  total: number;
-  last_page: number;
-}
-
 interface Props {
-  roles: PaginatedRoles;
+  roles: PaginatedData<Role>;
   permissions: Record<string, Permission[]>;
   filters: {
     search?: string;
@@ -48,9 +43,11 @@ interface Props {
   };
 }
 
+const { t: $t } = useI18n();
+const vTooltip = Tooltip;
+
 const props = defineProps<Props>();
 
-const { t: $t } = useI18n();
 const crud = useCrud({
   resourceName: 'role',
   resourceRouteName: 'roles',
@@ -85,6 +82,16 @@ const updatingPermissions = ref(false);
 
 const groupedPermissions = computed(() => props.permissions);
 
+const searchValue = computed({
+  get: () => {
+    const searchFilter = (filters.value as any)?.search;
+    return searchFilter?.value || '';
+  },
+  set: (value: string) => {
+    updateFilter('search', value);
+  },
+});
+
 const isSystemRole = (roleName: string): boolean => {
   const systemRoles = [
     'super-admin',
@@ -97,9 +104,33 @@ const isSystemRole = (roleName: string): boolean => {
 };
 
 const clearFilters = () => {
-  updateFilter('global', '');
+  updateFilter('search', '');
   onFilter();
 };
+
+// Create menu items for the responsive action buttons
+const createActionMenuItems = (role: Role): ActionMenuItem[] => [
+  {
+    label: $t('common.view'),
+    icon: 'pi pi-eye',
+    command: () => crud.viewItem(role.id),
+  },
+  {
+    label: $t('common.edit'),
+    icon: 'pi pi-pencil',
+    command: () => crud.editItem(role.id),
+  },
+  {
+    label: $t('roles.manage_permissions'),
+    icon: 'pi pi-cog',
+    command: () => openQuickAssignModal(role),
+  },
+  {
+    label: $t('common.delete'),
+    icon: 'pi pi-trash',
+    command: () => crud.confirmDelete(role.id),
+  },
+];
 
 const openQuickAssignModal = (role: Role) => {
   selectedRole.value = role;
@@ -158,52 +189,48 @@ watch(
   <Head :title="$t('roles.title')" />
 
   <AuthenticatedLayout>
-    <div class="mx-auto max-w-7xl p-4">
-      <!-- Page Header -->
-      <div
-        class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center"
-      >
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">
-            {{ $t('roles.title') }}
-          </h1>
-          <p class="mt-1 text-gray-600">{{ $t('roles.subtitle') }}</p>
-        </div>
-        <Button
-          :label="$t('roles.create')"
-          icon="pi pi-plus"
-          @click="crud.navigateToCreate()"
-          class="w-full sm:w-auto"
-        />
-      </div>
-
-      <!-- Search and Filters -->
-      <Card class="mb-6">
+    <Head :title="$t('roles.title')" />
+    <div class="mx-auto">
+      <!-- Page Header and Filters Card -->
+      <Card class="dark:border-primary-900 mb-4 dark:border">
+        <template #title>
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xl">{{ $t('roles.title') }}</span>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                {{ $t('roles.subtitle') }}
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <Button
+                :label="$t('common.clear_filters')"
+                icon="pi pi-filter-slash"
+                severity="secondary"
+                @click="clearFilters"
+              />
+              <Button
+                :label="$t('roles.create')"
+                icon="pi pi-plus"
+                @click="crud.navigateToCreate()"
+              />
+            </div>
+          </div>
+        </template>
         <template #content>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div class="flex flex-col">
               <label
                 for="searchRoles"
-                class="mb-2 text-sm font-medium text-gray-700"
+                class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 {{ $t('roles.search') }}
               </label>
               <InputText
                 id="searchRoles"
-                v-model="filters.global.value"
+                v-model="searchValue"
                 :placeholder="$t('roles.search_placeholder')"
                 class="w-full"
                 @input="onFilter"
-              />
-            </div>
-            <div class="flex items-end">
-              <Button
-                :label="$t('common.clear_filters')"
-                icon="pi pi-filter-slash"
-                severity="secondary"
-                outlined
-                @click="clearFilters"
-                class="w-full"
               />
             </div>
           </div>
@@ -211,13 +238,15 @@ watch(
       </Card>
 
       <!-- Roles Data Table -->
-      <Card>
+      <Card class="dark:border-primary-900 dark:border">
         <template #content>
           <DataTable
             :value="roles.data"
             :loading="loading"
             lazy
             paginator
+            responsiveLayout="scroll"
+            breakpoint="768px"
             :rows="roles.per_page || 15"
             :totalRecords="roles.total"
             @page="onPage($event)"
@@ -229,18 +258,20 @@ watch(
             class="p-datatable-sm"
             showGridlines
             stripedRows
-            responsiveLayout="scroll"
           >
             <Column
               field="name"
               :header="$t('roles.name')"
               :sortable="true"
-              class="min-w-48"
+              style="width: 25%"
             >
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
                   <i class="pi pi-users text-blue-600"></i>
-                  <span class="font-medium">{{ data.name }}</span>
+                  <ClickableName
+                    :displayName="data.name"
+                    :onClick="() => crud.viewItem(data.id)"
+                  />
                   <Tag
                     v-if="isSystemRole(data.name)"
                     :value="$t('roles.system_role')"
@@ -251,7 +282,7 @@ watch(
               </template>
             </Column>
 
-            <Column :header="$t('roles.permissions')" class="min-w-64">
+            <Column :header="$t('roles.permissions')" style="width: 35%">
               <template #body="{ data }">
                 <div class="flex flex-wrap gap-1">
                   <Tag
@@ -275,7 +306,7 @@ watch(
               field="users_count"
               :header="$t('roles.users_count')"
               :sortable="true"
-              class="w-32"
+              style="width: 15%"
             >
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
@@ -289,43 +320,49 @@ watch(
               field="created_at"
               :header="$t('common.created_at')"
               :sortable="true"
-              class="w-40"
+              style="width: 15%"
             >
               <template #body="{ data }">
                 {{ formatDate(data.created_at) }}
               </template>
             </Column>
 
-            <Column :header="$t('common.actions')" class="w-32">
+            <Column
+              :header="$t('common.actions')"
+              style="width: 20%; text-align: center"
+              :exportable="false"
+            >
               <template #body="{ data }">
-                <div class="flex gap-2">
+                <ResponsiveActionButtons
+                  :menuItems="createActionMenuItems(data)"
+                >
                   <Button
                     icon="pi pi-eye"
-                    size="small"
-                    severity="info"
-                    outlined
+                    class="p-button-rounded p-button-info p-button-text"
                     v-tooltip.top="$t('common.view')"
                     @click="crud.viewItem(data.id)"
                   />
                   <Button
                     icon="pi pi-pencil"
-                    size="small"
-                    severity="warning"
-                    outlined
+                    class="p-button-rounded p-button-warning p-button-text"
                     v-tooltip.top="$t('common.edit')"
                     @click="crud.editItem(data.id)"
                     :disabled="data.name === 'super-admin'"
                   />
                   <Button
+                    icon="pi pi-cog"
+                    class="p-button-rounded p-button-secondary p-button-text"
+                    v-tooltip.top="$t('roles.manage_permissions')"
+                    @click="openQuickAssignModal(data)"
+                  />
+                  <Button
                     icon="pi pi-trash"
-                    size="small"
-                    severity="danger"
-                    outlined
+                    class="p-button-rounded p-button-danger p-button-text"
                     v-tooltip.top="$t('common.delete')"
                     @click="crud.confirmDelete(data.id)"
                     :disabled="isSystemRole(data.name)"
                   />
-                </div>
+                </ResponsiveActionButtons>
               </template>
             </Column>
           </DataTable>
@@ -333,70 +370,17 @@ watch(
       </Card>
 
       <!-- Role Quick Assignment Modal -->
-      <Dialog
+      <QuickPermissionsModal
         v-model:visible="showQuickAssignModal"
-        :header="$t('roles.quick_assign_permissions')"
-        :style="{ width: '50rem' }"
-        :maximizable="true"
-        :modal="true"
-      >
-        <div v-if="selectedRole" class="space-y-4">
-          <div class="rounded-lg bg-blue-50 p-4">
-            <h4 class="mb-2 font-medium text-blue-900">
-              {{ $t('roles.editing_role') }}: {{ selectedRole.name }}
-            </h4>
-            <p class="text-sm text-blue-700">
-              {{ $t('roles.quick_assign_description') }}
-            </p>
-          </div>
-
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div
-              v-for="(groupPermissions, group) in groupedPermissions"
-              :key="group"
-              class="rounded-lg border p-4"
-            >
-              <h5 class="mb-3 font-semibold text-gray-800 capitalize">
-                {{ $t(`permissions.groups.${group}`, group) }}
-              </h5>
-              <div class="space-y-2">
-                <div
-                  v-for="permission in groupPermissions"
-                  :key="permission.id"
-                  class="flex items-center"
-                >
-                  <Checkbox
-                    :id="`perm-${permission.id}`"
-                    v-model="selectedPermissions"
-                    :value="permission.name"
-                  />
-                  <label
-                    :for="`perm-${permission.id}`"
-                    class="ml-2 cursor-pointer text-sm"
-                  >
-                    {{ permission.name }}
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-3 border-t pt-4">
-            <Button
-              :label="$t('common.cancel')"
-              severity="secondary"
-              outlined
-              @click="closeQuickAssignModal"
-            />
-            <Button
-              :label="$t('roles.update_permissions')"
-              icon="pi pi-save"
-              :loading="updatingPermissions"
-              @click="updateRolePermissions"
-            />
-          </div>
-        </div>
-      </Dialog>
+        :role="selectedRole"
+        :grouped-permissions="groupedPermissions"
+        v-model:selected-permissions="selectedPermissions"
+        :updating="updatingPermissions"
+        @hide="closeQuickAssignModal"
+        @update="updateRolePermissions"
+      />
     </div>
+
+    <ConfirmDialog />
   </AuthenticatedLayout>
 </template>

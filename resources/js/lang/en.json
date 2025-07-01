@@ -1,1 +1,138 @@
-{}
+{
+  "website": {
+    "nav": {
+      "home": "Home",
+      "features": "Features",
+      "pricing": "Pricing",
+      "support": "Support",
+      "contact": "Contact"
+    },
+    "hero": {
+      "title": "Welcome to Our Application",
+      "title_span": "Modern Platform",
+      "description": "Advanced Laravel + Vue.js application for your needs.",
+      "button": "Get Started"
+    },
+    "contact": {
+      "title": "Contact Us",
+      "description": "Reach out for any questions or information.",
+      "form": {
+        "name": "Name",
+        "email": "Email",
+        "message": "Message",
+        "submit": "Send"
+      }
+    }
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "remember": "Remember Me",
+    "forgot_password": "Forgot Your Password?",
+    "confirm_password": "Confirm Password"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to the Dashboard"
+  },
+  "users": {
+    "title": "Users",
+    "create": "Create User",
+    "edit": "Edit User",
+    "name": "Name",
+    "email": "Email",
+    "roles": "Roles",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "roles": {
+    "title": "Roles",
+    "subtitle": "Manage user roles and permissions",
+    "create": "Create Role",
+    "create_role": "Create Role",
+    "create_role_description": "Create a new role with specific permissions",
+    "edit": "Edit Role",
+    "edit_role": "Edit Role",
+    "edit_role_description": "Edit role details and permissions",
+    "update_role": "Update Role",
+    "view_role": "View Role",
+    "view_role_description": "View role details and assigned users",
+    "name": "Name",
+    "permissions": "Permissions",
+    "permissions_count": "Permissions Count",
+    "users_count": "Users Count",
+    "users_assigned": "Users Assigned",
+    "assigned_users": "Assigned Users",
+    "actions": "Actions",
+    "search": "Search",
+    "search_placeholder": "Search roles...",
+    "manage_permissions": "Manage Permissions",
+    "system_role": "System Role",
+    "system_role_description": "This is a system role and cannot be deleted",
+    "system_role_name_readonly": "System role names cannot be changed",
+    "role_information": "Role Information",
+    "basic_information": "Basic Information",
+    "basic_information_description": "Enter the basic role details",
+    "role_statistics": "Role Statistics",
+    "permissions_description": "Select the permissions for this role",
+    "selected_permissions": "Selected Permissions",
+    "of": "of",
+    "permissions_selected": "permissions selected",
+    "select_all": "Select All",
+    "clear_all": "Clear All",
+    "clear": "Clear",
+    "quick_assign_permissions": "Quick Assign Permissions",
+    "editing_role": "Editing Role",
+    "quick_assign_description": "Quickly assign or remove permissions for this role",
+    "update_permissions": "Update Permissions"
+  },
+  "permissions": {
+    "groups": {
+      "users": "User Management",
+      "roles": "Role Management", 
+      "dashboard": "Dashboard Access",
+      "reports": "Reports",
+      "settings": "Settings",
+      "tickets": "Ticket Management",
+      "admin": "Administration"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "edit": "Edit Profile",
+    "name": "Name",
+    "email": "Email",
+    "update": "Update Profile"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "loading": "Loading...",
+    "no_data": "No Data",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "clear_filters": "Clear Filters",
+    "created_at": "Created At",
+    "actions": "Actions"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "min": "Minimum characters: :min",
+    "max": "Maximum characters: :max"
+  }
+}
